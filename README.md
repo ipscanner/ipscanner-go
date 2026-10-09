@@ -54,6 +54,10 @@ demo, err := client.IP.Demo(ctx, "1.2.3.4") // no key required
 me, err := client.IP.MyIP(ctx)              // no key required
 ```
 
+`VPNProvider` is the VPN brand (for example Mullvad) when known; `Provider` is the network owner.
+
+On the Free plan premium fields (purity, provider, VPN brand, precise location) come back as JSON null, so they decode as zero values, and are listed in `Locked` with `PlanRequired`.
+
 ### Bulk
 
 ```go
@@ -89,6 +93,36 @@ batch, err := client.Agentscan.Batch(ctx, []ipscanner.AgentscanBatchLine{{Line: 
 check, err := client.Agentscan.Verify(ctx, ipscanner.AgentscanVerifyParams{IP: "66.249.66.1", UserAgent: "Googlebot"})
 agents, err := client.Agentscan.Allowlist(ctx)
 self, err := client.Agentscan.SelfCheck(ctx, nil)
+```
+
+### Edge and sites
+
+```go
+res, err := client.Edge.Check(ctx, ipscanner.EdgeCheckParams{
+	IP:        "1.2.3.4",
+	Site:      "site_...",
+	UserAgent: r.UserAgent(),
+})
+fmt.Println(res.Class, res.Site != nil)
+
+policy, err := client.Sites.Policy(ctx, "site_...")
+```
+
+`Edge.Check` is metered as 2 requests. `Sites.Policy` is not metered.
+
+### Gate
+
+Runs on your server. Sends no API key; the site secret is the credential. Never retried.
+
+```go
+v, err := client.Gate.Verify(ctx, ipscanner.GateVerifyParams{
+	Secret:   "gs_...",
+	Token:    token, // the token gate.js added to the form
+	RemoteIP: clientIP,
+})
+if err == nil && v.Action != "block" {
+	// accept the form
+}
 ```
 
 ### Provenance
