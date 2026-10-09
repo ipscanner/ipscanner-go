@@ -17,7 +17,7 @@ import (
 )
 
 // Version is the SDK version sent in the User-Agent header.
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 // DefaultBaseURL is the API host used when no base URL is configured.
 const DefaultBaseURL = "https://ipscanner.io"
@@ -36,6 +36,9 @@ type Client struct {
 	Account      *AccountService
 	ASNDirectory *ASNDirectoryService
 	Crawlers     *CrawlersService
+	Edge         *EdgeService
+	Sites        *SitesService
+	Gate         *GateService
 
 	apiKey     string
 	baseURL    string
@@ -111,6 +114,9 @@ func NewClient(opts ...Option) *Client {
 	c.Account = &AccountService{c}
 	c.ASNDirectory = &ASNDirectoryService{c}
 	c.Crawlers = &CrawlersService{c}
+	c.Edge = &EdgeService{c}
+	c.Sites = &SitesService{c}
+	c.Gate = &GateService{c}
 	return c
 }
 
@@ -119,15 +125,19 @@ func escapePath(s string) string {
 }
 
 func (c *Client) get(ctx context.Context, path string, query url.Values, out any) error {
-	return c.doJSON(ctx, http.MethodGet, path, query, nil, out)
+	return c.doJSON(ctx, http.MethodGet, path, query, nil, out, true)
 }
 
 func (c *Client) post(ctx context.Context, path string, body, out any) error {
-	return c.doJSON(ctx, http.MethodPost, path, nil, body, out)
+	return c.doJSON(ctx, http.MethodPost, path, nil, body, out, true)
 }
 
-func (c *Client) doJSON(ctx context.Context, method, path string, query url.Values, body, out any) error {
-	data, err := c.doRaw(ctx, method, path, query, body, "application/json")
+func (c *Client) postKeyless(ctx context.Context, path string, body, out any) error {
+	return c.doJSON(ctx, http.MethodPost, path, nil, body, out, false)
+}
+
+func (c *Client) doJSON(ctx context.Context, method, path string, query url.Values, body, out any, auth bool) error {
+	data, err := c.doRaw(ctx, method, path, query, body, "application/json", auth)
 	if err != nil {
 		return err
 	}
@@ -140,13 +150,13 @@ func (c *Client) doJSON(ctx context.Context, method, path string, query url.Valu
 	return nil
 }
 
-func (c *Client) doRaw(ctx context.Context, method, path string, query url.Values, body any, accept string) ([]byte, error) {
+func (c *Client) doRaw(ctx context.Context, method, path string, query url.Values, body any, accept string, auth bool) ([]byte, error) {
 	if _, ok := ctx.Deadline(); !ok && c.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, c.timeout)
 		defer cancel()
 	}
-	resp, err := c.send(ctx, method, path, query, body, accept)
+	resp, err := c.send(ctx, method, path, query, body, accept, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +168,7 @@ func (c *Client) doRaw(ctx context.Context, method, path string, query url.Value
 	return data, nil
 }
 
-func (c *Client) send(ctx context.Context, method, path string, query url.Values, body any, accept string) (*http.Response, error) {
+func (c *Client) send(ctx context.Context, method, path string, query url.Values, body any, accept string, auth bool) (*http.Response, error) {
 	u := c.baseURL + path
 	if len(query) > 0 {
 		u += "?" + query.Encode()
@@ -190,7 +200,7 @@ func (c *Client) send(ctx context.Context, method, path string, query url.Values
 		}
 		req.Header.Set("Accept", accept)
 		req.Header.Set("User-Agent", c.userAgent)
-		if c.apiKey != "" {
+		if auth && c.apiKey != "" {
 			req.Header.Set("Authorization", "Bearer "+c.apiKey)
 		}
 

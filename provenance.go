@@ -178,5 +178,5 @@ func (s *ProvenanceService) Export(ctx context.Context, params *ExportParams) ([
 			q.Set("to", params.To)
 		}
 	}
-	return s.c.doRaw(ctx, http.MethodGet, "/v1/provenance/export", q, nil, "text/csv")
+	return s.c.doRaw(ctx, http.MethodGet, "/v1/provenance/export", q, nil, "text/csv", true)
 }

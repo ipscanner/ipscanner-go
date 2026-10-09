@@ -34,7 +34,7 @@ func TestAuthHeaderPresent(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer pk_test_123" {
 			t.Errorf("Authorization = %q", got)
 		}
-		if got := r.Header.Get("User-Agent"); got != "ipscanner-go/0.1.0" {
+		if got := r.Header.Get("User-Agent"); got != "ipscanner-go/0.2.0" {
 			t.Errorf("User-Agent = %q", got)
 		}
 		if got := r.Header.Get("Accept"); got != "application/json" {
@@ -592,5 +592,115 @@ func TestAccountLimitsNullWindows(t *testing.T) {
 	}
 	if l.Daily != nil || l.Hourly == nil || l.Hourly.Remaining != 4997 {
 		t.Errorf("unexpected limits: %+v", l)
+	}
+}
+
+func TestLookupLocked(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{
+			"target": {"raw": "example.com", "kind": "hostname", "ip": "93.184.216.34", "hostname": "example.com"},
+			"reserved": {"reserved": false},
+			"verdict": {"classification": "vpn", "anonymized": true, "confidence": 0.9, "method": "range", "evidence": ["vpn_range", "future_value"]},
+			"purity": null, "provider": null, "vpnProvider": null,
+			"networkClass": "some_new_class", "isVpn": true, "isProxy": false, "isTor": false, "riskScore": 80,
+			"geo": {"ip": "93.184.216.34", "country": "United States", "countryCode": "US", "city": "", "region": "",
+				"postalCode": null, "latitude": null, "longitude": null, "timezone": "UTC", "accuracyRadius": null},
+			"whoisStatus": "timeout", "degraded": ["whois"],
+			"at": "2026-10-09T12:00:00Z",
+			"locked": ["purity", "provider", "vpnProvider", "geo.latitude", "geo.longitude", "geo.postalCode", "geo.accuracyRadius"],
+			"planRequired": "Starter"
+		}`)
+	})
+	res, err := c.IP.Lookup(context.Background(), "example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Purity.Score != 0 || res.Purity.Deductions != nil || res.Provider != "" || res.VPNProvider != "" {
+		t.Errorf("premium fields not zero: %+v", res)
+	}
+	if res.Geo.Latitude != 0 || res.Geo.PostalCode != "" || res.Geo.AccuracyRadius != 0 || res.Geo.CountryCode != "US" {
+		t.Errorf("geo = %+v", res.Geo)
+	}
+	if len(res.Locked) != 7 || res.Locked[3] != "geo.latitude" || res.PlanRequired != "Starter" {
+		t.Errorf("markers = %v %q", res.Locked, res.PlanRequired)
+	}
+	if res.NetworkClass != "some_new_class" || len(res.Verdict.Evidence) != 2 {
+		t.Errorf("unexpected result: %+v", res)
+	}
+	if res.Whois != nil || res.WhoisStatus != "timeout" {
+		t.Errorf("whois = %+v status %q", res.Whois, res.WhoisStatus)
+	}
+}
+
+func TestLookupVPNProvider(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{
+			"target": {"raw": "example.com", "kind": "hostname", "ip": "185.65.134.1", "hostname": "example.com"},
+			"verdict": {"classification": "vpn", "anonymized": true, "confidence": 0.99, "method": "list", "evidence": ["vpn_server_list"]},
+			"purity": {"score": 10, "grade": "C", "verdict": "dirty", "deductions": []},
+			"networkClass": "vpn", "isVpn": true, "provider": "M247", "vpnProvider": "Mullvad", "riskScore": 95,
+			"whois": {"domain": "example.com", "registrar": "R", "nameservers": ["a"], "status": [], "privacyProtection": false},
+			"whoisStatus": "ok", "at": "2026-10-09T12:00:00Z"
+		}`)
+	})
+	res, err := c.IP.Lookup(context.Background(), "example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.VPNProvider != "Mullvad" || res.Provider != "M247" || res.Verdict.Evidence[0] != "vpn_server_list" || res.Purity.Grade != "C" {
+		t.Errorf("unexpected result: %+v", res)
+	}
+	if res.WhoisStatus != "ok" || res.Whois.Registrar != "R" || res.Locked != nil {
+		t.Errorf("unexpected whois: %+v", res)
+	}
+}
+
+func TestVPNAndProxyFields(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/vpn/1.2.3.4" {
+			io.WriteString(w, `{"ip":"1.2.3.4","isVpn":true,"isTor":false,"networkClass":"vpn","anonymized":true,"provider":"M247","vpnProvider":"Proton VPN","riskScore":90,"evidence":["vpn_operator"]}`)
+			return
+		}
+		io.WriteString(w, `{"ip":"1.2.3.4","isProxy":false,"isTor":false,"networkClass":"relay","anonymized":true,"provider":null,"vpnProvider":null,"riskScore":40,"evidence":["relay_range"],"locked":["provider","vpnProvider"],"planRequired":"Starter"}`)
+	})
+	vpn, err := c.IP.VPN(context.Background(), "1.2.3.4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vpn.VPNProvider != "Proton VPN" || vpn.Provider != "M247" || vpn.Evidence[0] != "vpn_operator" || vpn.Locked != nil {
+		t.Errorf("vpn = %+v", vpn)
+	}
+	proxy, err := c.IP.Proxy(context.Background(), "1.2.3.4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proxy.NetworkClass != "relay" || proxy.Provider != "" || proxy.VPNProvider != "" || len(proxy.Locked) != 2 || proxy.PlanRequired != "Starter" {
+		t.Errorf("proxy = %+v", proxy)
+	}
+}
+
+func TestGeoLocked(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"ip":"1.2.3.4","country":"Germany","countryCode":"DE","city":"Berlin","region":"BE","postalCode":null,"latitude":null,"longitude":null,"timezone":"Europe/Berlin","accuracyRadius":null,"locked":["latitude","longitude","postalCode","accuracyRadius"],"planRequired":"Starter"}`)
+	})
+	g, err := c.IP.Geo(context.Background(), "1.2.3.4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.City != "Berlin" || g.Latitude != 0 || len(g.Locked) != 4 || g.PlanRequired != "Starter" {
+		t.Errorf("geo = %+v", g)
+	}
+}
+
+func TestWhoisStatus(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"domain":"example.com","registrar":"","registeredOn":"","expiresOn":"","lastUpdated":"","nameservers":[],"status":[],"privacyProtection":false,"whoisStatus":"unavailable"}`)
+	})
+	wi, err := c.IP.Whois(context.Background(), "example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wi.WhoisStatus != "unavailable" || wi.Registrar != "" || len(wi.Nameservers) != 0 {
+		t.Errorf("whois = %+v", wi)
 	}
 }

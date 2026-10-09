@@ -4,38 +4,48 @@ import "time"
 
 // VPNInfo is the response of GET /v1/vpn/{ip}.
 type VPNInfo struct {
-	IP           string `json:"ip"`
-	IsVPN        bool   `json:"isVpn"`
-	IsTor        bool   `json:"isTor"`
-	NetworkClass string `json:"networkClass"`
-	Anonymized   bool   `json:"anonymized"`
-	Provider     string `json:"provider"`
-	RiskScore    int    `json:"riskScore"`
+	IP           string   `json:"ip"`
+	IsVPN        bool     `json:"isVpn"`
+	IsTor        bool     `json:"isTor"`
+	NetworkClass string   `json:"networkClass"`
+	Anonymized   bool     `json:"anonymized"`
+	Provider     string   `json:"provider"`
+	VPNProvider  string   `json:"vpnProvider"`
+	RiskScore    int      `json:"riskScore"`
+	Evidence     []string `json:"evidence,omitempty"`
+	Locked       []string `json:"locked,omitempty"`
+	PlanRequired string   `json:"planRequired,omitempty"`
 }
 
 // ProxyInfo is the response of GET /v1/proxy/{ip}.
 type ProxyInfo struct {
-	IP           string `json:"ip"`
-	IsProxy      bool   `json:"isProxy"`
-	IsTor        bool   `json:"isTor"`
-	NetworkClass string `json:"networkClass"`
-	Anonymized   bool   `json:"anonymized"`
-	Provider     string `json:"provider"`
-	RiskScore    int    `json:"riskScore"`
+	IP           string   `json:"ip"`
+	IsProxy      bool     `json:"isProxy"`
+	IsTor        bool     `json:"isTor"`
+	NetworkClass string   `json:"networkClass"`
+	Anonymized   bool     `json:"anonymized"`
+	Provider     string   `json:"provider"`
+	VPNProvider  string   `json:"vpnProvider"`
+	RiskScore    int      `json:"riskScore"`
+	Evidence     []string `json:"evidence,omitempty"`
+	Locked       []string `json:"locked,omitempty"`
+	PlanRequired string   `json:"planRequired,omitempty"`
 }
 
-// Geolocation is the response of GET /v1/geo/{ip}.
+// Geolocation is the response of GET /v1/geo/{ip}. Locked and PlanRequired are only set on the /v1/geo body.
 type Geolocation struct {
-	IP             string  `json:"ip"`
-	Country        string  `json:"country"`
-	CountryCode    string  `json:"countryCode"`
-	City           string  `json:"city"`
-	Region         string  `json:"region"`
-	PostalCode     string  `json:"postalCode"`
-	Latitude       float64 `json:"latitude"`
-	Longitude      float64 `json:"longitude"`
-	Timezone       string  `json:"timezone"`
-	AccuracyRadius int     `json:"accuracyRadius"`
+	IP             string   `json:"ip"`
+	Country        string   `json:"country"`
+	CountryCode    string   `json:"countryCode"`
+	City           string   `json:"city"`
+	Region         string   `json:"region"`
+	PostalCode     string   `json:"postalCode"`
+	Latitude       float64  `json:"latitude"`
+	Longitude      float64  `json:"longitude"`
+	Timezone       string   `json:"timezone"`
+	AccuracyRadius int      `json:"accuracyRadius"`
+	Locked         []string `json:"locked,omitempty"`
+	PlanRequired   string   `json:"planRequired,omitempty"`
 }
 
 // ASNInfo is the response of GET /v1/asn/{ip}.
@@ -47,7 +57,7 @@ type ASNInfo struct {
 	Country string `json:"country"`
 }
 
-// WhoisInfo is the response of GET /v1/whois/{domain}.
+// WhoisInfo is the response of GET /v1/whois/{domain}. WhoisStatus is ok, not_found, timeout, unavailable or unparsed.
 type WhoisInfo struct {
 	Domain            string   `json:"domain"`
 	Registrar         string   `json:"registrar"`
@@ -57,9 +67,10 @@ type WhoisInfo struct {
 	Nameservers       []string `json:"nameservers"`
 	Status            []string `json:"status"`
 	PrivacyProtection bool     `json:"privacyProtection"`
+	WhoisStatus       string   `json:"whoisStatus,omitempty"`
 }
 
-// LookupResult is the full detection result for one target.
+// LookupResult is the full detection result for one target. Fields nulled by the plan are zero and listed in Locked.
 type LookupResult struct {
 	Target       Target       `json:"target"`
 	Reserved     Reserved     `json:"reserved"`
@@ -70,13 +81,17 @@ type LookupResult struct {
 	IsProxy      bool         `json:"isProxy"`
 	IsTor        bool         `json:"isTor"`
 	Provider     string       `json:"provider,omitempty"`
+	VPNProvider  string       `json:"vpnProvider,omitempty"`
 	RiskScore    int          `json:"riskScore"`
 	NetworkType  string       `json:"networkType,omitempty"`
 	Geo          *Geolocation `json:"geo,omitempty"`
 	ASN          *ASNInfo     `json:"asn,omitempty"`
 	Whois        *WhoisInfo   `json:"whois,omitempty"`
+	WhoisStatus  string       `json:"whoisStatus,omitempty"`
 	Degraded     []string     `json:"degraded,omitempty"`
 	At           time.Time    `json:"at"`
+	Locked       []string     `json:"locked,omitempty"`
+	PlanRequired string       `json:"planRequired,omitempty"`
 }
 
 // Target describes what was looked up.
@@ -98,10 +113,11 @@ type Reserved struct {
 
 // Verdict is the network classification of an address.
 type Verdict struct {
-	Classification string  `json:"classification"`
-	Anonymized     bool    `json:"anonymized"`
-	Confidence     float64 `json:"confidence"`
-	Method         string  `json:"method"`
+	Classification string   `json:"classification"`
+	Anonymized     bool     `json:"anonymized"`
+	Confidence     float64  `json:"confidence"`
+	Method         string   `json:"method"`
+	Evidence       []string `json:"evidence,omitempty"`
 }
 
 // Purity is the 0-100 cleanliness score and its grade.

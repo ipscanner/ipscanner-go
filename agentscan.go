@@ -113,18 +113,20 @@ type AgentscanSelfCheckParams struct {
 
 // AgentscanSelfCheckResult is the classification of the calling connection.
 type AgentscanSelfCheckResult struct {
-	IP         string         `json:"ip"`
-	UserAgent  string         `json:"userAgent"`
-	JA4        string         `json:"ja4"`
-	JA4Source  string         `json:"ja4Source"`
-	Class      string         `json:"class"`
-	Confidence float64        `json:"confidence"`
-	Action     string         `json:"action"`
-	Signals    map[string]any `json:"signals"`
-	Metered    bool           `json:"metered"`
-	AsOf       time.Time      `json:"asOf"`
-	ASN        *ASNInfo       `json:"asn,omitempty"`
-	Geo        *Geolocation   `json:"geo,omitempty"`
+	IP           string         `json:"ip"`
+	UserAgent    string         `json:"userAgent"`
+	JA4          string         `json:"ja4"`
+	JA4Source    string         `json:"ja4Source"`
+	Class        string         `json:"class"`
+	Confidence   float64        `json:"confidence"`
+	Action       string         `json:"action"`
+	Signals      map[string]any `json:"signals"`
+	Metered      bool           `json:"metered"`
+	AsOf         time.Time      `json:"asOf"`
+	ASN          *ASNInfo       `json:"asn,omitempty"`
+	Geo          *Geolocation   `json:"geo,omitempty"`
+	Locked       []string       `json:"locked,omitempty"`
+	PlanRequired string         `json:"planRequired,omitempty"`
 }
 
 // Check classifies one request.

@@ -159,3 +159,70 @@ func TestStreamLongLine(t *testing.T) {
 		t.Errorf("unexpected events")
 	}
 }
+
+func TestBulkCheckLocked(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"submitted":1,"unique":1,"duplicates":0,"invalid":[],"summary":{},
+			"results":[{"input":"1.1.1.1","ip":"1.1.1.1","score":null,"grade":null,"verdict":null,"classification":"hosting","confidence":0.9,
+				"anonymized":true,"vpnProvider":null,"isTorExit":false,"inVpnRange":false,"inDatacenterRange":true,"deductions":null,
+				"locked":["score","grade","verdict","deductions","vpnProvider"]}],
+			"planRequired":"Starter"}`)
+	})
+	out, err := c.Bulk.Check(context.Background(), BulkParams{IPs: []string{"1.1.1.1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := out.Results[0]
+	if row.Score != 0 || row.Grade != "" || row.Verdict != "" || row.Deductions != nil || row.VPNProvider != "" || row.Classification != "hosting" {
+		t.Errorf("row = %+v", row)
+	}
+	if len(row.Locked) != 5 || out.PlanRequired != "Starter" || len(out.Summary) != 0 {
+		t.Errorf("markers = %v %q", row.Locked, out.PlanRequired)
+	}
+}
+
+func TestBulkCheckVPNProvider(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"submitted":1,"unique":1,"results":[{"ip":"185.65.134.1","score":5,"grade":"C","verdict":"dirty","classification":"vpn","vpnProvider":"Mullvad","deductions":[]}]}`)
+	})
+	out, err := c.Bulk.Check(context.Background(), BulkParams{IPs: []string{"185.65.134.1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row := out.Results[0]; row.VPNProvider != "Mullvad" || row.Locked != nil || out.PlanRequired != "" {
+		t.Errorf("row = %+v", row)
+	}
+}
+
+func TestStreamLocked(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"type":"meta","total":2,"metered":2,"planRequired":"Starter"}
+{"type":"result","ip":"1.1.1.1","verdict":null,"classification":"hosting","score":null,"grade":null,"vpnProvider":null,"locked":["score","grade","verdict","vpnProvider"]}
+{"type":"result","index":1,"ip":"185.65.134.1","classification":"vpn","vpnProvider":"Mullvad","score":5,"grade":"C","verdict":"dirty","unknownField":true}
+{"type":"done","reason":"complete","total":2,"processed":2}
+`)
+	})
+	var events []*BulkEvent
+	for ev, err := range c.Bulk.Stream(context.Background(), BulkParams{IPs: []string{"1.1.1.1", "185.65.134.1"}}) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		events = append(events, ev)
+	}
+	if len(events) != 4 {
+		t.Fatalf("got %d events", len(events))
+	}
+	meta, locked, open := events[0], events[1], events[2]
+	if meta.PlanRequired != "Starter" {
+		t.Errorf("meta = %+v", meta)
+	}
+	if locked.Score != 0 || locked.Grade != "" || locked.Verdict != "" || locked.VPNProvider != "" || len(locked.Locked) != 4 {
+		t.Errorf("locked = %+v", locked)
+	}
+	if open.VPNProvider != "Mullvad" || open.Locked != nil || open.Score != 5 {
+		t.Errorf("open = %+v", open)
+	}
+	if !events[3].Complete() {
+		t.Errorf("done should be complete")
+	}
+}
