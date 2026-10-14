@@ -13,8 +13,11 @@ type VPNInfo struct {
 	VPNProvider  string   `json:"vpnProvider"`
 	RiskScore    int      `json:"riskScore"`
 	Evidence     []string `json:"evidence,omitempty"`
-	Locked       []string `json:"locked,omitempty"`
-	PlanRequired string   `json:"planRequired,omitempty"`
+	// Purity is the score breakdown; nil when the plan locks it (DeductionCount then says how many reasons it holds).
+	Purity         *Purity  `json:"purity"`
+	DeductionCount *int     `json:"deductionCount,omitempty"`
+	Locked         []string `json:"locked,omitempty"`
+	PlanRequired   string   `json:"planRequired,omitempty"`
 }
 
 // ProxyInfo is the response of GET /v1/proxy/{ip}.
@@ -28,8 +31,11 @@ type ProxyInfo struct {
 	VPNProvider  string   `json:"vpnProvider"`
 	RiskScore    int      `json:"riskScore"`
 	Evidence     []string `json:"evidence,omitempty"`
-	Locked       []string `json:"locked,omitempty"`
-	PlanRequired string   `json:"planRequired,omitempty"`
+	// Purity is the score breakdown; nil when the plan locks it (DeductionCount then says how many reasons it holds).
+	Purity         *Purity  `json:"purity"`
+	DeductionCount *int     `json:"deductionCount,omitempty"`
+	Locked         []string `json:"locked,omitempty"`
+	PlanRequired   string   `json:"planRequired,omitempty"`
 }
 
 // Geolocation is the response of GET /v1/geo/{ip}. Locked and PlanRequired are only set on the /v1/geo body.
@@ -90,8 +96,10 @@ type LookupResult struct {
 	WhoisStatus  string       `json:"whoisStatus,omitempty"`
 	Degraded     []string     `json:"degraded,omitempty"`
 	At           time.Time    `json:"at"`
-	Locked       []string     `json:"locked,omitempty"`
-	PlanRequired string       `json:"planRequired,omitempty"`
+	// DeductionCount is set on a locked result: how many reasons the withheld purity holds.
+	DeductionCount *int     `json:"deductionCount,omitempty"`
+	Locked         []string `json:"locked,omitempty"`
+	PlanRequired   string   `json:"planRequired,omitempty"`
 }
 
 // Target describes what was looked up.

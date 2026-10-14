@@ -56,7 +56,16 @@ me, err := client.IP.MyIP(ctx)              // no key required
 
 `VPNProvider` is the VPN brand (for example Mullvad) when known; `Provider` is the network owner.
 
-On the Free plan premium fields (purity, provider, VPN brand, precise location) come back as JSON null, so they decode as zero values, and are listed in `Locked` with `PlanRequired`.
+On the Free plan premium fields (purity, provider, VPN brand, precise location) come back as JSON null, so they decode as zero values, and are listed in `Locked` with `PlanRequired`. `VPN` and `Proxy` carry `Purity` (the score breakdown) on paid plans; when it is locked, `DeductionCount` says how many reasons it holds.
+
+### Email
+
+```go
+res, err := client.Email.Check(ctx, "jane@outlok.com")
+// res.Status: valid, invalid, risky or unknown; res.Reason: typo; res.Suggestion: jane@outlook.com
+```
+
+Checks syntax, throwaway domains, whether the domain receives mail, typos of big webmail domains and role addresses. The mailbox itself is not probed. One request per address.
 
 ### Bulk
 
@@ -119,11 +128,14 @@ v, err := client.Gate.Verify(ctx, ipscanner.GateVerifyParams{
 	Secret:   "gs_...",
 	Token:    token, // the token gate.js added to the form
 	RemoteIP: clientIP,
+	Email:    form.Email, // optional: adds the email check (one request)
 })
 if err == nil && v.Action != "block" {
 	// accept the form
 }
 ```
+
+With `Email` set, `v.Email` holds the check and its action, and `v.Action` is the stricter of the network and email actions.
 
 ### Provenance
 

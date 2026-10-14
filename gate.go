@@ -13,6 +13,8 @@ type GateVerifyParams struct {
 	Secret   string `json:"secret"`
 	Token    string `json:"token"`
 	RemoteIP string `json:"remote_ip,omitempty"`
+	// Email is the address the form submitted. Optional; adds an email check (one request).
+	Email string `json:"email,omitempty"`
 }
 
 // GateVerification is the response of POST /v1/gate/verify.
@@ -27,6 +29,7 @@ type GateVerification struct {
 	Hostname     string      `json:"hostname"`
 	IssuedAt     time.Time   `json:"issued_at"`
 	IPMatch      bool        `json:"ip_match"`
+	Email        *GateEmail  `json:"email,omitempty"`
 	Locked       []string    `json:"locked,omitempty"`
 	PlanRequired string      `json:"planRequired,omitempty"`
 }
@@ -37,6 +40,15 @@ type GateNetwork struct {
 	Anonymized     bool   `json:"anonymized"`
 	Provider       string `json:"provider"`
 	VPNProvider    string `json:"vpn_provider"`
+}
+
+// GateEmail is the email check of a verification, present when Email was sent.
+type GateEmail struct {
+	Status     string `json:"status"`
+	Reason     string `json:"reason"`
+	Suggestion string `json:"suggestion"`
+	Domain     string `json:"domain"`
+	Action     string `json:"action"`
 }
 
 // Verify redeems a gate token. It sends no API key and is never retried.
