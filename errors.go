@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -156,7 +157,7 @@ func newError(resp *http.Response, data []byte) error {
 		RateLimit:       h,
 	}
 	if b.RetryAfter != nil {
-		e.RetryAfter = time.Duration(*b.RetryAfter) * time.Second
+		e.RetryAfter = retrySeconds(*b.RetryAfter)
 	}
 	if t, err := time.Parse(time.RFC3339, b.ResetAt); err == nil {
 		e.ResetAt = t
@@ -210,7 +211,7 @@ func retryAfter(v string) time.Duration {
 		return 0
 	}
 	if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-		return time.Duration(n) * time.Second
+		return retrySeconds(n)
 	}
 	if t, err := http.ParseTime(v); err == nil {
 		if d := time.Until(t); d > 0 {
@@ -218,4 +219,16 @@ func retryAfter(v string) time.Duration {
 		}
 	}
 	return 0
+}
+
+// retrySeconds ignores a negative count and caps one that would overflow a Duration.
+func retrySeconds(n int64) time.Duration {
+	const maxSeconds = int64(math.MaxInt64 / int64(time.Second))
+	if n <= 0 {
+		return 0
+	}
+	if n > maxSeconds {
+		n = maxSeconds
+	}
+	return time.Duration(n) * time.Second
 }
