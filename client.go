@@ -126,6 +126,16 @@ func escapePath(s string) string {
 	return strings.ReplaceAll(url.PathEscape(s), ":", "%3A")
 }
 
+// dotSegment reports a "." or ".." segment, which servers and proxies resolve to another endpoint.
+func dotSegment(path string) bool {
+	for _, seg := range strings.Split(path, "/") {
+		if seg == "." || seg == ".." {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Client) get(ctx context.Context, path string, query url.Values, out any) error {
 	return c.doJSON(ctx, http.MethodGet, path, query, nil, out, true)
 }
@@ -171,6 +181,9 @@ func (c *Client) doRaw(ctx context.Context, method, path string, query url.Value
 }
 
 func (c *Client) send(ctx context.Context, method, path string, query url.Values, body any, accept string, auth bool) (*http.Response, error) {
+	if dotSegment(path) {
+		return nil, fmt.Errorf("ipscanner: invalid request path %q", path)
+	}
 	u := c.baseURL + path
 	if len(query) > 0 {
 		u += "?" + query.Encode()
