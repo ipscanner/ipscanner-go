@@ -101,7 +101,7 @@ func TestVPNPurityAndLockedCount(t *testing.T) {
 
 func TestUserAgentVersion(t *testing.T) {
 	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if ua := r.Header.Get("User-Agent"); ua != "ipscanner-go/0.3.0" {
+		if ua := r.Header.Get("User-Agent"); ua != "ipscanner-go/0.3.1" {
 			t.Errorf("User-Agent = %q", ua)
 		}
 		io.WriteString(w, `{"email":"a@b.io","status":"valid","domain":"b.io","checks":{},"mailbox":"not_checked"}`)

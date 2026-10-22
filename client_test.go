@@ -34,7 +34,7 @@ func TestAuthHeaderPresent(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer pk_test_123" {
 			t.Errorf("Authorization = %q", got)
 		}
-		if got := r.Header.Get("User-Agent"); got != "ipscanner-go/0.3.0" {
+		if got := r.Header.Get("User-Agent"); got != "ipscanner-go/0.3.1" {
 			t.Errorf("User-Agent = %q", got)
 		}
 		if got := r.Header.Get("Accept"); got != "application/json" {
